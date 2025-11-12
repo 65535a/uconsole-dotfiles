@@ -1,0 +1,15 @@
+general.live_config_reload = true
+
+[window]
+decorations = "none"
+
+[font]
+normal = { family = "Inconsolata", style = "Regular" }
+bold = { family = "Inconsolata", style = "Bold" }
+italic = { family = "Inconsolata", style = "Italic" }
+bold_italic = { family = "Inconsolata", style = "Bold Italic" }
+size = 16.0
+
+[colors.primary]
+background = "#1e1e23"
+foreground = "#d3d7cf"

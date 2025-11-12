@@ -1,0 +1,36 @@
+# ~/.config/i3blocks/config
+
+# General settings
+separator_block_width=10
+markup=pango
+
+# Block definitions
+[time]
+label=⏰
+command=date '+%Y-%m-%d %H:%M:%S'
+interval=1
+
+[volume]
+label=🔊
+command=amixer get Master | awk -F'[][]' 'END{print $4}'
+interval=1
+
+[battery]
+label=🔋
+command=acpi -b | awk '{print $4 " " $5}' | tr -d ','
+interval=10
+
+[network]
+label=🌐
+command=ip a | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -d'/' -f1
+interval=5
+
+[cpu]
+label=🖥️
+command=top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}'
+interval=2
+
+[memory]
+label=🧠
+command=free -h | awk '/^Mem:/ {print $3 "/" $2}'
+interval=5
