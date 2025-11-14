@@ -204,8 +204,8 @@ bar {
 	status_command i3blocks -c ~/.config/i3blocks/config
 	position top 
 	colors {
-		background #222222
-		statusline #ffffff
+		background #252528
+		statusline #7a7c7f
 		separator  #666666
 
     # Class            Border  Bground Text
