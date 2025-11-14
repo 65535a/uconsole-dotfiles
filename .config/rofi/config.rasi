@@ -39,10 +39,10 @@ configuration {
 }
 
 window {
-	location:	 west;
-	anchor:		 west;
-	height:		 100%;
-	width:		 30%;
+	location:	 center;
+	anchor:		 center;
+	height:		 60%;
+	width:		 80%;
 	orientation: horizontal;
 	children:	 [mainbox];
 	border: 2px solid;
