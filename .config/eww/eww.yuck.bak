@@ -1,0 +1,99 @@
+;; =====================================================================
+;;  Eww stats + journal widgets for Raspberry Pi 4 / CM4 (uConsole)
+;;  Tuned for the uConsole's 1280x720 screen and the Pi's modest CPU.
+;;  Scripts live in ~/.config/eww/scripts/ (chmod +x them).
+;; =====================================================================
+
+;; ===== Polling variables =====
+;; CPU: real delta from /proc/stat (top -bn1 only shows the since-boot average)
+(defpoll cpu_usage :interval "1s" :initial "0"
+    "$HOME/.config/eww/scripts/cpu.sh")
+
+;; RAM: used = total - available
+(defpoll mem_usage :interval "2s" :initial "0"
+    "awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.0f\", (t-a)/t*100}' /proc/meminfo")
+
+;; Temp: the Pi SoC sensor, no lm-sensors needed
+(defpoll cpu_temp :interval "2s" :initial "0"
+    "awk '{printf \"%.1f\", $1/1000}' /sys/class/thermal/thermal_zone0/temp")
+
+;; Network: follows whatever interface holds the default route (wlan0, eth0, usb0...)
+(defpoll net_down :interval "2s" :initial "0" "$HOME/.config/eww/scripts/net.sh rx")
+(defpoll net_up   :interval "2s" :initial "0" "$HOME/.config/eww/scripts/net.sh tx")
+
+;; Top processes as JSON [{name, val}]
+(defpoll top_cpu :interval "5s" :initial "[]" "$HOME/.config/eww/scripts/top.sh cpu")
+(defpoll top_mem :interval "5s" :initial "[]" "$HOME/.config/eww/scripts/top.sh mem")
+
+;; Journal: fewer lines, slower poll (jq + journalctl every 3s is costly on a Pi)
+(defpoll journal_lines :interval "5s" :initial "[]"
+    "journalctl -n 32 -o cat --no-pager | sed -r 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | iconv -f utf-8 -t utf-8 -c | jq -R -s -c 'split(\"\\n\") | map(select(length > 0))'")
+
+;; ===== System stat graphs (CPU / RAM / Temp) =====
+(defwidget stat-box [label value min max color]
+  (box :class "stat-box" :orientation "v" :space-evenly false
+    (label :class "graph-tag" :text label)
+    (graph :value value :thickness 1 :time-range "60s" :min min :max max :dynamic true
+           :width 160 :height 48 :class color)))
+
+(defwidget system-graphs []
+  (box :class "graph-row" :orientation "v" :space-evenly false :spacing 6
+    (stat-box :label "CPU ${cpu_usage}%" :value cpu_usage :min 0 :max 100 :color "graph-graph")
+    (stat-box :label "RAM ${mem_usage}%" :value mem_usage :min 0 :max 100 :color "graph-graph")
+    (stat-box :label "TMP ${cpu_temp}°C" :value cpu_temp :min 20 :max 90 :color "graph-graph")))
+
+;; ===== Network graphs =====
+(defwidget net-graphs []
+  (box :class "graph-row" :orientation "v" :space-evenly false :spacing 6
+    (box :class "stat-box" :orientation "v" :space-evenly false
+      (label :class "graph-tag" :text "↓ ${net_down} KB/s")
+      (graph :value {net_down} :thickness 1 :time-range "60s" :min 0 :max 5000 :dynamic true
+             :width 160 :height 48 :class "graph-net-down"))
+    (box :class "stat-box" :orientation "v" :space-evenly false
+      (label :class "graph-tag" :text "↑ ${net_up} KB/s")
+      (graph :value {net_up} :thickness 1 :time-range "60s" :min 0 :max 5000 :dynamic true
+             :width 160 :height 48 :class "graph-net-up"))))
+
+;; ===== Top processes =====
+(defwidget proc-list [title procs unit]
+  (box :class "proc-panel" :orientation "v" :space-evenly false :spacing 2
+    (label :class "panel-title" :text title :halign "start")
+    (for proc in procs
+      (box :orientation "h" :space-evenly false :spacing 6
+        (label :class "proc-name" :text {proc.name} :limit-width 12 :halign "start" :hexpand true :xalign 0)
+        (label :class "proc-val" :text "${proc.val}${unit}" :halign "end")))))
+
+(defwidget top-processes []
+  (box :class "graph-row" :orientation "v" :space-evenly false :spacing 6
+    (proc-list :title "Top CPU" :procs top_cpu :unit "%")
+    (proc-list :title "Top RAM" :procs top_mem :unit "%")))
+
+;; ===== Combined stats window =====
+(defwidget all-widgets []
+  (box :class "graph-row" :orientation "v" :space-evenly false :spacing 8
+    (system-graphs)
+    (net-graphs)
+    (top-processes)))
+
+;; y offset 40px clears the Raspberry Pi OS top panel; use 8px if you have none
+(defwindow stats-widget
+  :monitor 0
+  :geometry (geometry :x "8px" :y "40px" :width "180px" :height "670px" :anchor "top right")
+  :stacking "bg"
+  :exclusive false
+  (all-widgets))
+
+;; ===== Journal log widget =====
+(defwidget journal-log []
+  (box :class "journal-panel" :orientation "v" :space-evenly false
+    (for line in journal_lines
+      (label :class "journal-line" :text {line} :halign "start" :xalign 0
+             :limit-width 140 :truncate true))))
+
+;; Fills the space left of the stats column on a 1280x720 screen
+(defwindow journal-widget
+  :monitor 0
+  :geometry (geometry :x "8px" :y "40px" :width "880px" :height "670px" :anchor "top left")
+  :stacking "bg"
+  :exclusive false
+  (journal-log))
